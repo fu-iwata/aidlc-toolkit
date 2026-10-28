@@ -1,0 +1,249 @@
+{
+  "name": "aidlc-toolkit",
+  "displayName": "AI-DLC Toolkit",
+  "description": "AI-DLC の intent 一覧と、AI-DLC の audit から計算した今月と intent ごとの推定コスト（モデル別の内訳と日本円）をまとめて表示する、非公式の拡張機能。",
+  "version": "0.1.0",
+  "publisher": "fu-iwata",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fu-iwata/aidlc-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fu-iwata/aidlc-toolkit/issues"
+  },
+  "homepage": "https://github.com/fu-iwata/aidlc-toolkit#readme",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Visualization"
+  ],
+  "keywords": [
+    "AI-DLC",
+    "aidlc",
+    "Claude Code",
+    "cost",
+    "usage"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:aidlc/spaces/*/intents/intents.json",
+    "workspaceContains:aidlc/spaces/*/intents/*/aidlc-state.md"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "制限モードでも、ワークスペースの AI-DLC の記録を読んで表示するだけで、コードは実行しない。単価表のパス（aidlcToolkit.modelRatesPath）は、信頼したワークスペースでだけ使う。",
+      "restrictedConfigurations": [
+        "aidlcToolkit.modelRatesPath"
+      ]
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aidlcToolkit",
+          "title": "AI-DLC Toolkit",
+          "icon": "resources/aidlc-toolkit.svg"
+        }
+      ]
+    },
+    "views": {
+      "aidlcToolkit": [
+        {
+          "id": "aidlcToolkit.intents",
+          "name": "Intent 一覧",
+          "icon": "resources/aidlc-intents.svg",
+          "when": "aidlcToolkit.hasRecords"
+        },
+        {
+          "id": "aidlcToolkit.usage",
+          "name": "使用量（今月）",
+          "icon": "resources/aidlc-usage.svg",
+          "when": "aidlcToolkit.hasRecords"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aidlcToolkit.intents.refresh",
+          "when": "view == aidlcToolkit.intents",
+          "group": "navigation"
+        },
+        {
+          "command": "aidlcToolkit.usage.refresh",
+          "when": "view == aidlcToolkit.usage",
+          "group": "navigation"
+        },
+        {
+          "command": "aidlcToolkit.usage.show",
+          "when": "view == aidlcToolkit.usage",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "aidlcToolkit.intents.openState",
+          "when": "view == aidlcToolkit.intents && viewItem == intent",
+          "group": "navigation"
+        },
+        {
+          "command": "aidlcToolkit.intents.copyName",
+          "when": "view == aidlcToolkit.intents && viewItem =~ /^intent/",
+          "group": "9_copy"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "aidlcToolkit.intents.copyName",
+          "when": "false"
+        },
+        {
+          "command": "aidlcToolkit.intents.openState",
+          "when": "false"
+        },
+        {
+          "command": "aidlcToolkit.usage.show",
+          "when": "aidlcToolkit.hasRecords"
+        },
+        {
+          "command": "aidlcToolkit.usage.refresh",
+          "when": "aidlcToolkit.hasRecords"
+        },
+        {
+          "command": "aidlcToolkit.intents.refresh",
+          "when": "aidlcToolkit.hasRecords"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "aidlcToolkit.usage.show",
+        "title": "今月の使用量の内訳を表示",
+        "icon": "$(table)",
+        "category": "AI-DLC Toolkit",
+        "enablement": "aidlcToolkit.hasRecords"
+      },
+      {
+        "command": "aidlcToolkit.usage.refresh",
+        "title": "使用量を再集計",
+        "icon": "$(refresh)",
+        "category": "AI-DLC Toolkit",
+        "enablement": "aidlcToolkit.hasRecords"
+      },
+      {
+        "command": "aidlcToolkit.intents.refresh",
+        "title": "Intent 一覧を再読み込み",
+        "icon": "$(refresh)",
+        "category": "AI-DLC Toolkit",
+        "enablement": "aidlcToolkit.hasRecords"
+      },
+      {
+        "command": "aidlcToolkit.intents.openState",
+        "title": "状態ファイル（aidlc-state.md）を開く",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.intents.copyName",
+        "title": "intent 名をコピー",
+        "category": "AI-DLC Toolkit"
+      }
+    ],
+    "configuration": {
+      "title": "AI-DLC Toolkit",
+      "properties": {
+        "aidlcToolkit.usdJpyRate": {
+          "type": "number",
+          "default": 150,
+          "minimum": 0,
+          "markdownDescription": "USD から JPY への換算レート。**既定値 150 は仮の値です。** 実際に使うレートに合わせてください。"
+        },
+        "aidlcToolkit.timeZone": {
+          "type": "string",
+          "default": "Asia/Tokyo",
+          "description": "「今月」の境界を決めるタイムゾーン（IANA 名）。"
+        },
+        "aidlcToolkit.regionalPremium": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "金額に、日本国内クロスリージョン推論（Bedrock の `jp.` の推論プロファイル）の上乗せ（基本料金の +10%）を含める。Bedrock の `jp.` を使っているときに ON にする。"
+        },
+        "aidlcToolkit.modelRates": {
+          "type": "object",
+          "default": {},
+          "scope": "application",
+          "markdownDescription": "自分で使う単価（USD / 100 万トークン、標準の単価）。モデル名（例 `opus-5-5`）ごとに書いた行が、拡張機能に同梱の単価表より優先される。書かなかったモデルは同梱の単価表を使う。`aidlcToolkit.regionalPremium` が ON なら、この単価にも上乗せを掛ける。ユーザー設定にだけ書ける。",
+          "propertyNames": {
+            "pattern": "^[a-z0-9][a-z0-9.-]*$",
+            "patternErrorMessage": "モデル名は opus-5-5 のように、小文字・数字・点・ハイフンで書いてください。"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "input",
+              "cacheWrite5m",
+              "cacheWrite1h",
+              "cacheRead",
+              "output"
+            ],
+            "properties": {
+              "input": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cacheWrite5m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cacheWrite1h": {
+                "type": "number",
+                "minimum": 0
+              },
+              "cacheRead": {
+                "type": "number",
+                "minimum": 0
+              },
+              "output": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "aidlcToolkit.modelRatesPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "拡張機能に同梱の model-rates.json に無いモデルを補う単価表（同じ形式）のパス。空ならワークスペースの .claude/tools/data/model-rates.json を使う。ユーザー設定（リモートではそのマシンの設定）にだけ書ける。"
+        }
+      }
+    },
+    "viewsWelcome": [
+      {
+        "view": "aidlcToolkit.intents",
+        "contents": "作業中の space に、まだ intent がありません。\nAI-DLC で作業を始めると、ここに intent の一覧と進み具合が表示されます。"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test out/usage.test.js out/intents.test.js out/intentUsage.test.js out/rates.test.js out/records.test.js",
+    "package": "npm run compile && vsce package --no-dependencies -o aidlc-toolkit.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.4.0"
+  },
+  "preview": true
+}
