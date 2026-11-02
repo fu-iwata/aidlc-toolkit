@@ -25,7 +25,6 @@ function section(event: string, stage: string, extra: string[], timestamp = "202
     `**Timestamp**: ${timestamp}`,
     `**Event**: ${event}`,
     `**Stage**: ${stage}`,
-    "**Cost USD**: 999.00",
     ...extra,
     "",
   ].join("\n");
@@ -129,7 +128,7 @@ test("Given a completed stage with totals only When parseAuditUsage Then it is c
   assert.equal(stage.models[0].counts.cacheCreate5m, 5);
 });
 
-test("Given audit shards When summarizeIntent Then cost comes from tokens and rates, not Cost USD", () => {
+test("Given no Cost USD in the audit When summarizeIntent Then cost comes from tokens and rates", () => {
   const usage = summarizeIntent(
     [
       audit(section("STAGE_COMPLETED", "a", ["**Tokens By Model**: opus-5=0/1M/0/0; claude-haiku-5-5=0/1M/0/0"])),
@@ -140,11 +139,60 @@ test("Given audit shards When summarizeIntent Then cost comes from tokens and ra
   );
   assert.ok(usage);
   assert.equal(usage.stages, 2);
-  // opus-5 の出力 2M × $25 + haiku-5-5 の出力 1M × $0.55。Cost USD の 999 は使わない。
+  // opus-5 の出力 2M × $25 + haiku-5-5 の出力 1M × $0.55。Cost USD が無いので、トークンから計算する。
   assert.equal(usage.usd, 50.55);
   assert.equal(usage.buckets[0].model, "opus-5");
   assert.equal(usage.buckets.find((b) => b.model === "haiku-5-5")?.usd, 0.55);
   assert.deepEqual(usage.unpricedModels, ["claude-sonnet-9"]);
+});
+
+test("Given Cost USD and every model priced When summarizeIntent Then Cost USD is used and split by the rates", () => {
+  const usage = summarizeIntent(
+    [audit(section("STAGE_COMPLETED", "a", ["**Cost USD**: 3.5", "**By Model**: opus-5=3.5", "**Tokens By Model**: opus-5=0/1M/0/0"]))],
+    rates,
+  );
+  assert.equal(usage?.usd, 3.5);
+  assert.equal(usage?.buckets[0].usd, 3.5);
+});
+
+test("Given a model the table does not price (By Model null) When summarizeIntent Then the totals are priced and Cost USD is not used", () => {
+  const usage = summarizeIntent(
+    [
+      audit(
+        section("STAGE_COMPLETED", "a", [
+          "**Cost USD**: 999.00",
+          "**By Model**: claude-haiku-5-5=null; opus-5=25.00",
+          "**Tokens In**: 0",
+          "**Tokens Out**: 2000000",
+          "**Cache Read**: 0",
+          "**Cache Write**: 0",
+          "**Tokens By Model**: claude-haiku-5-5=0/1M/0/0; opus-5=0/1M/0/0",
+        ]),
+      ),
+    ],
+    rates,
+  );
+  // opus-5 の出力 1M × $25 + haiku-5-5 の出力 1M × $0.55。
+  assert.equal(usage?.usd, 25.55);
+});
+
+test("Given Cost USD and the regional premium When summarizeIntent Then the premium is added to Cost USD", () => {
+  const usage = summarizeIntent(
+    [audit(section("STAGE_COMPLETED", "a", ["**Cost USD**: 2", "**By Model**: opus-5=2", "**Tokens By Model**: opus-5=0/1M/0/0"]))],
+    rates,
+    1.1,
+  );
+  assert.ok(Math.abs((usage?.usd ?? 0) - 2.2) < 1e-9);
+});
+
+test("Given Cost USD grows across completions When parseAuditUsage Then each row carries the increase", () => {
+  const entries = parseAuditUsage(
+    audit(
+      section("STAGE_COMPLETED", "a", ["**Cost USD**: 1", "**By Model**: opus-5=1", "**Tokens By Model**: opus-5=0/1k/0/0"]),
+      section("STAGE_COMPLETED", "a", ["**Cost USD**: 3", "**By Model**: opus-5=3", "**Tokens By Model**: opus-5=0/3k/0/0"]),
+    ),
+  );
+  assert.deepEqual(entries.map((e) => e.costUsd), [1, 2]);
 });
 
 test("Given completions in two months When summarizeAuditMonth Then only the increase made in the month counts", () => {

@@ -47,7 +47,8 @@ export type Folder = { root: string; name: string };
 type Snapshot = { folder: Folder; views: IntentView[]; error?: string };
 
 // 使用量の金額を出すための単価表と換算レート。読み直すたびに最新の設定を取る。asOf は単価表の確認日。
-export type Pricing = () => Promise<{ rates: Record<string, Rate>; usdJpyRate: number; asOf?: string }>;
+// costFactor は日本国内クロスリージョン推論の上乗せ（Cost USD の金額に掛ける。単価表の値には掛け済み）。
+export type Pricing = () => Promise<{ rates: Record<string, Rate>; usdJpyRate: number; asOf?: string; costFactor: number }>;
 
 export type Node =
   | { kind: "folder"; snapshot: Snapshot }
@@ -81,14 +82,18 @@ async function readDescription(dir: string): Promise<string> {
 async function readUsage(
   dir: string,
   rates: Record<string, Rate>,
+  costFactor: number,
 ): Promise<{ usage?: IntentUsage; unreadableAudit: number }> {
   const shards = await readAuditShards(dir);
-  return { usage: summarizeIntent(shards, rates), unreadableAudit: shards.filter((s) => !auditReadable(s)).length };
+  return {
+    usage: summarizeIntent(shards, rates, costFactor),
+    unreadableAudit: shards.filter((s) => !auditReadable(s)).length,
+  };
 }
 
 // 一覧は、作業中の space の intents.json と active-intent を直接読む。どちらも読み取りだけ。
 // intents.json の dirName は parseIntentEntries がフォルダ名 1 つのものだけに絞る。
-async function loadSnapshot(root: string, rates: Record<string, Rate>): Promise<IntentView[]> {
+async function loadSnapshot(root: string, rates: Record<string, Rate>, costFactor: number): Promise<IntentView[]> {
   const dir = intentsDir(root, await readActiveSpace(root));
   const text = await readText(path.join(dir, "intents.json"));
   let registered: IntentEntry[] = [];
@@ -115,7 +120,7 @@ async function loadSnapshot(root: string, rates: Record<string, Rate>): Promise<
       const [stateText, description, usage] = await Promise.all([
         readText(path.join(intentDir, "aidlc-state.md")),
         readDescription(intentDir),
-        readUsage(intentDir, rates),
+        readUsage(intentDir, rates, costFactor),
       ]);
       return {
         entry,
@@ -146,11 +151,11 @@ export class IntentTreeProvider implements vscode.TreeDataProvider<Node> {
 
   // 読み直す。読めなかったフォルダがあれば理由を返す（ビューのメッセージに出す）。
   async reload(): Promise<string | undefined> {
-    const [folders, { rates, usdJpyRate, asOf }] = await Promise.all([this.folders(), this.pricing()]);
+    const [folders, { rates, usdJpyRate, asOf, costFactor }] = await Promise.all([this.folders(), this.pricing()]);
     this.snapshots = await Promise.all(
       folders.map(async (folder): Promise<Snapshot> => {
         try {
-          return { folder, views: await loadSnapshot(folder.root, rates) };
+          return { folder, views: await loadSnapshot(folder.root, rates, costFactor) };
         } catch (err) {
           return { folder, views: [], error: describeError(err) };
         }
@@ -170,12 +175,12 @@ export class IntentTreeProvider implements vscode.TreeDataProvider<Node> {
   // 読んでいる間に一覧が読み直されたら、古い一覧で上書きしない。
   async reprice(): Promise<void> {
     const snapshots = this.snapshots;
-    const { rates, usdJpyRate, asOf } = await this.pricing();
+    const { rates, usdJpyRate, asOf, costFactor } = await this.pricing();
     const repriced = await Promise.all(
       snapshots.map(async (snapshot) => ({
         ...snapshot,
         views: await Promise.all(
-          snapshot.views.map(async (view) => ({ ...view, ...(await readUsage(view.dir, rates)) })),
+          snapshot.views.map(async (view) => ({ ...view, ...(await readUsage(view.dir, rates, costFactor)) })),
         ),
       })),
     );

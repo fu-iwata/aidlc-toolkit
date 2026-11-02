@@ -50,10 +50,10 @@ export type RatesFile = {
   rates?: Record<string, Rate>;
 };
 
-// 単価表を重ねる。base（拡張機能に同梱の単価表）にある行はそのまま使い、
-// base に無いモデルの行だけを extra（ワークスペースの .claude/ の単価表）で補う。
+// 単価表を重ねる。extra（ワークスペースの .claude/ の単価表、AI-DLC が用意する正の表）にある行はそのまま使い、
+// extra に無いモデルの行だけを base（拡張機能に同梱の単価表）で補う。
 export function mergeRates(base: RatesFile, extra: RatesFile): RatesFile {
-  return { rates: { ...extra.rates, ...base.rates } };
+  return { rates: { ...base.rates, ...extra.rates } };
 }
 
 

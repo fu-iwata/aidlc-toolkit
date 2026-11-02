@@ -25,9 +25,9 @@ test("monthKeyOf uses the configured time zone at the month boundary", () => {
   assert.equal(monthKeyOf("not a date", "Asia/Tokyo"), null);
 });
 
-test("Given bundled and workspace rate tables When mergeRates Then the bundled row wins and missing models are filled", () => {
-  const workspace = { rates: { "sonnet-5-5": rates["opus-5"], "haiku-5-5": rates["opus-5"] } };
-  const merged = mergeRates({ rates: { "sonnet-5-5": rates["sonnet-5-5"] } }, workspace);
-  assert.equal(merged.rates?.["sonnet-5-5"], rates["sonnet-5-5"]);
+test("Given bundled and workspace rate tables When mergeRates Then the workspace row wins and missing models are filled from bundled", () => {
+  const workspace = { rates: { "sonnet-5-5": rates["opus-5"] } };
+  const merged = mergeRates({ rates: { "sonnet-5-5": rates["sonnet-5-5"], "haiku-5-5": rates["opus-5"] } }, workspace);
+  assert.equal(merged.rates?.["sonnet-5-5"], rates["opus-5"]);
   assert.equal(merged.rates?.["haiku-5-5"], rates["opus-5"]);
 });

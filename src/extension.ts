@@ -47,8 +47,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // アクティビティバーの intent 一覧。読み取り専用で、記録の変更を見て読み直す。
   const intents = new IntentTreeProvider(recordFolders, async () => {
-    const { rates, asOf } = await loadRates(await recordFolders());
-    return { rates, asOf, usdJpyRate: config().get<number>("usdJpyRate", 150) };
+    const { rates, asOf, premium } = await loadRates(await recordFolders());
+    return { rates, asOf, usdJpyRate: config().get<number>("usdJpyRate", 150), costFactor: premiumFactor(premium) };
   });
   const intentView = vscode.window.createTreeView("aidlcToolkit.intents", {
     treeDataProvider: intents,
@@ -167,7 +167,7 @@ async function readRatesFile(file: string): Promise<RatesFile> {
   }
 }
 
-// 同梱の単価表に無いモデルを補う単価表。設定 aidlcToolkit.modelRatesPath が空なら、
+// AI-DLC が用意する正の単価表（同梱の単価表より優先する）。設定 aidlcToolkit.modelRatesPath が空なら、
 // 記録があるフォルダごとの .claude/tools/data/model-rates.json を、先のフォルダを優先して重ねる。
 async function readExtraRates(folders: Folder[]): Promise<RatesFile> {
   const configured = config().get<string>("modelRatesPath", "").trim();
@@ -178,8 +178,8 @@ async function readExtraRates(folders: Folder[]): Promise<RatesFile> {
   return { rates: Object.assign({}, ...tables.map((t) => t.rates ?? {}).reverse()) };
 }
 
-// 単価は、ワークスペースの .claude/ の単価表 → 拡張機能に同梱の単価表 → 設定 aidlcToolkit.modelRates の順に重ね、
-// あとのものを優先する。同梱の単価表は読むだけで、個人の単価は設定に書く。
+// 単価は、ワークスペースの .claude/ の単価表（AI-DLC が用意する正の表）→ 拡張機能に同梱の単価表（足りないモデルだけ）
+// → 設定 aidlcToolkit.modelRates の順に重ね、先のものを優先する。同梱の単価表は読むだけで、個人の単価は設定に書く。
 // 日本国内クロスリージョン推論の上乗せが ON（設定 aidlcToolkit.regionalPremium）なら、設定の行も含めて全部の単価に掛ける。
 // 長文の単価は使わない（audit からは呼び出し 1 回ごとのプロンプトの長さが分からない）。
 async function loadRates(folders: Folder[]): Promise<{
@@ -237,7 +237,7 @@ async function refresh(): Promise<void> {
       loadRates(folders),
       readActiveAuditShards(folders),
     ]);
-    const total = summarizeAuditMonth(shards, { monthKey, timeZone: tz, rates });
+    const total = summarizeAuditMonth(shards, { monthKey, timeZone: tz, rates, costFactor: premiumFactor(premium) });
     const unreadable = shards.filter((s) => !auditReadable(s)).length;
     latest = { total, rate, premium, asOf, unreadable };
     statusItem.text = `$(graph) AI-DLC 推定 ${formatJpy(total.usd, rate)}`;
