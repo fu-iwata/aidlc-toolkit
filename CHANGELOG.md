@@ -1,5 +1,11 @@
 # 変更履歴
 
+## 0.2.0
+
+- 金額は、audit の `Cost USD` があればそれを使う。モデルに単価表の無いもの（`null`）があるときは、丸めの無い合計から単価表で計算し直す。
+- 日本国内クロスリージョン推論の上乗せ（`aidlcToolkit.regionalPremium`）は、`Cost USD` の金額にも掛ける。
+- 単価表は、AI-DLC の `.claude/tools/data/model-rates.json` を優先する。同梱の単価表は、それに無いモデル（`haiku-5-5`）だけを持つ。
+
 ## 0.1.0
 
 - 最初の公開。
