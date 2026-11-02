@@ -1,0 +1,46 @@
+name: Publish
+
+# main に入ったら、package.json の version が Visual Studio Marketplace の最新の版と違うときだけ公開する。
+# 公開には Secret の VSCE_PAT（Marketplace の発行者 fu-iwata の Personal Access Token）が要る。
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: 公開済みの版と比べる
+        id: version
+        run: |
+          local=$(node -p "require('./package.json').version")
+          published=$(npx vsce show fu-iwata.aidlc-toolkit --json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).versions[0].version")
+          echo "local=$local published=$published"
+          if [ "$local" = "$published" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "version $local は公開済みなので、公開しません。"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: テスト
+        if: steps.version.outputs.changed == 'true'
+        run: npm test
+
+      - name: 公開
+        if: steps.version.outputs.changed == 'true'
+        run: npx vsce publish --no-dependencies -p "$VSCE_PAT"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
