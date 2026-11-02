@@ -1,93 +1,16 @@
 {
-  "_comment": "拡張機能の単価表（USD / 100 万トークン）。値は公式の標準単価（platform.claude.com/docs/en/about-claude/pricing、2026-10-27 に確認）。設定 aidlcToolkit.regionalPremium が ON のとき、計算には各単価に (1 + rate) を掛けた値を使う（Bedrock の日本国内クロスリージョン推論（jp. の推論プロファイル）は、基本料金（グローバル）より 10% 高い）。使用量（今月）と intent ごとの使用量の金額は、この表で計算する。ここに無いモデルは、ワークスペースの .claude/tools/data/model-rates.json（設定 aidlcToolkit.modelRatesPath）で補う。haiku-5-5 の長文（10 万トークン超）の単価は、audit から呼び出しごとの長さが分からないので持たない。キーは版ごとに別の行にし、点リリース（opus-5-5）を主版（opus-5）の行で計算しない。この表は拡張機能に同梱して読むだけにする。個人で単価を変えるときは設定 aidlcToolkit.modelRates に書く（モデルごとにこの表より優先する）。既定の単価を変えるときはこのファイルを直して .vsix を作り直す。",
+  "_comment": "拡張機能に同梱の単価表（USD / 100 万トークン）。AI-DLC が用意する .claude/tools/data/model-rates.json に無いモデルだけを補う（その表が正で、同じモデルの行はそちらを優先する）。値は公式の標準単価（platform.claude.com/docs/en/about-claude/pricing、2026-10-27 に確認）。設定 aidlcToolkit.regionalPremium が ON のとき、計算には各単価に (1 + rate) を掛けた値を使う（Bedrock の日本国内クロスリージョン推論（jp. の推論プロファイル）は、基本料金（グローバル）より 10% 高い）。個人で単価を変えるときは設定 aidlcToolkit.modelRates に書く（モデルごとにこの表より優先する）。既定の単価を変えるときはこのファイルを直して .vsix を作り直す。",
   "asOf": "2026-10-27",
   "regionalPremium": {
     "rate": 0.1
   },
   "rates": {
-    "opus-5-5": {
-      "input": 4,
-      "cacheWrite5m": 5,
-      "cacheWrite1h": 8,
-      "cacheRead": 0.2,
-      "output": 20
-    },
-    "opus-5": {
-      "input": 5,
-      "cacheWrite5m": 6.25,
-      "cacheWrite1h": 10,
-      "cacheRead": 0.5,
-      "output": 25
-    },
-    "opus-4-8": {
-      "input": 5,
-      "cacheWrite5m": 6.25,
-      "cacheWrite1h": 10,
-      "cacheRead": 0.5,
-      "output": 25
-    },
-    "opus-4-7": {
-      "input": 5,
-      "cacheWrite5m": 6.25,
-      "cacheWrite1h": 10,
-      "cacheRead": 0.5,
-      "output": 25
-    },
-    "opus-4-6": {
-      "input": 5,
-      "cacheWrite5m": 6.25,
-      "cacheWrite1h": 10,
-      "cacheRead": 0.5,
-      "output": 25
-    },
-    "sonnet-5-5": {
-      "input": 2,
-      "cacheWrite5m": 2.5,
-      "cacheWrite1h": 4,
-      "cacheRead": 0.1,
-      "output": 10
-    },
-    "sonnet-5": {
-      "input": 2,
-      "cacheWrite5m": 2.5,
-      "cacheWrite1h": 4,
-      "cacheRead": 0.2,
-      "output": 10
-    },
-    "sonnet-4-6": {
-      "input": 3,
-      "cacheWrite5m": 3.75,
-      "cacheWrite1h": 6,
-      "cacheRead": 0.3,
-      "output": 15
-    },
     "haiku-5-5": {
       "input": 0.1,
       "cacheWrite5m": 0.125,
       "cacheWrite1h": 0.2,
       "cacheRead": 0.01,
       "output": 0.5
-    },
-    "haiku-4-5": {
-      "input": 1,
-      "cacheWrite5m": 1.25,
-      "cacheWrite1h": 2,
-      "cacheRead": 0.1,
-      "output": 5
-    },
-    "fable-5-1": {
-      "input": 10,
-      "cacheWrite5m": 12.5,
-      "cacheWrite1h": 20,
-      "cacheRead": 0.25,
-      "output": 50
-    },
-    "fable-5": {
-      "input": 10,
-      "cacheWrite5m": 12.5,
-      "cacheWrite1h": 20,
-      "cacheRead": 1,
-      "output": 50
     }
   }
 }
