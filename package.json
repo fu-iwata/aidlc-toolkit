@@ -2,7 +2,7 @@
   "name": "aidlc-toolkit",
   "displayName": "AI-DLC Toolkit",
   "description": "AI-DLC の intent 一覧と、AI-DLC の audit から計算した今月と intent ごとの推定コスト（モデル別の内訳と日本円）をまとめて表示する、非公式の拡張機能。",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "fu-iwata",
   "license": "MIT",
   "repository": {
