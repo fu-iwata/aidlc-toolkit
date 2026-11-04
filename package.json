@@ -39,9 +39,10 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "制限モードでも、ワークスペースの AI-DLC の記録を読んで表示するだけで、コードは実行しない。単価表のパス（aidlcToolkit.modelRatesPath）は、信頼したワークスペースでだけ使う。",
+      "description": "制限モードでは、ワークスペースの AI-DLC の記録を読んで表示するだけで、aidlc コマンド（診断）は実行しない。単価表のパス（aidlcToolkit.modelRatesPath）と aidlc のパス（aidlcToolkit.aidlcPath）は、信頼したワークスペースでだけ使う。",
       "restrictedConfigurations": [
-        "aidlcToolkit.modelRatesPath"
+        "aidlcToolkit.modelRatesPath",
+        "aidlcToolkit.aidlcPath"
       ]
     }
   },
@@ -68,6 +69,12 @@
           "name": "使用量（今月）",
           "icon": "resources/aidlc-usage.svg",
           "when": "aidlcToolkit.hasRecords"
+        },
+        {
+          "id": "aidlcToolkit.doctor",
+          "name": "診断",
+          "icon": "resources/aidlc-doctor.svg",
+          "when": "aidlcToolkit.hasRecords"
         }
       ]
     },
@@ -87,6 +94,21 @@
           "command": "aidlcToolkit.usage.show",
           "when": "view == aidlcToolkit.usage",
           "group": "navigation"
+        },
+        {
+          "command": "aidlcToolkit.doctor.run",
+          "when": "view == aidlcToolkit.doctor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aidlcToolkit.doctor.copyAll",
+          "when": "view == aidlcToolkit.doctor",
+          "group": "navigation@2"
+        },
+        {
+          "command": "aidlcToolkit.doctor.toggleOk",
+          "when": "view == aidlcToolkit.doctor",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -98,6 +120,16 @@
         {
           "command": "aidlcToolkit.intents.copyName",
           "when": "view == aidlcToolkit.intents && viewItem =~ /^intent/",
+          "group": "9_copy"
+        },
+        {
+          "command": "aidlcToolkit.doctor.copyItem",
+          "when": "view == aidlcToolkit.doctor && viewItem =~ /^doctorItem/",
+          "group": "9_copy"
+        },
+        {
+          "command": "aidlcToolkit.doctor.copyFix",
+          "when": "view == aidlcToolkit.doctor && (viewItem == doctorItemWithFix || viewItem == doctorFix)",
           "group": "9_copy"
         }
       ],
@@ -120,6 +152,22 @@
         },
         {
           "command": "aidlcToolkit.intents.refresh",
+          "when": "aidlcToolkit.hasRecords"
+        },
+        {
+          "command": "aidlcToolkit.doctor.copyItem",
+          "when": "false"
+        },
+        {
+          "command": "aidlcToolkit.doctor.copyFix",
+          "when": "false"
+        },
+        {
+          "command": "aidlcToolkit.doctor.showOutput",
+          "when": "false"
+        },
+        {
+          "command": "aidlcToolkit.doctor.run",
           "when": "aidlcToolkit.hasRecords"
         }
       ]
@@ -154,6 +202,40 @@
       {
         "command": "aidlcToolkit.intents.copyName",
         "title": "intent 名をコピー",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.doctor.run",
+        "title": "診断を実行（aidlc doctor）",
+        "icon": "$(play)",
+        "category": "AI-DLC Toolkit",
+        "enablement": "isWorkspaceTrusted"
+      },
+      {
+        "command": "aidlcToolkit.doctor.copyAll",
+        "title": "診断の結果をすべてコピー",
+        "icon": "$(copy)",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.doctor.toggleOk",
+        "title": "正常の項目の表示を切り替え",
+        "icon": "$(list-flat)",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.doctor.copyItem",
+        "title": "項目をコピー",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.doctor.copyFix",
+        "title": "直し方をコピー",
+        "category": "AI-DLC Toolkit"
+      },
+      {
+        "command": "aidlcToolkit.doctor.showOutput",
+        "title": "診断の文字の出力を開く",
         "category": "AI-DLC Toolkit"
       }
     ],
@@ -224,6 +306,12 @@
           "default": "",
           "scope": "machine",
           "description": "拡張機能に同梱の model-rates.json に無いモデルを補う単価表（同じ形式）のパス。空ならワークスペースの .claude/tools/data/model-rates.json を使う。ユーザー設定（リモートではそのマシンの設定）にだけ書ける。"
+        },
+        "aidlcToolkit.aidlcPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "診断（`aidlc doctor`）に使う aidlc コマンドのパス。空なら PATH の `aidlc`、無ければ `~/.local/bin/aidlc` を使う。ユーザー設定（リモートではそのマシンの設定）にだけ書ける。"
         }
       }
     },
@@ -236,7 +324,7 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
-    "test": "npm run compile && node --test out/usage.test.js out/intents.test.js out/intentUsage.test.js out/rates.test.js out/records.test.js",
+    "test": "npm run compile && node --test out/usage.test.js out/intents.test.js out/intentUsage.test.js out/rates.test.js out/records.test.js out/doctor.test.js",
     "package": "npm run compile && vsce package --no-dependencies -o aidlc-toolkit.vsix"
   },
   "devDependencies": {

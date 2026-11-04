@@ -22,6 +22,9 @@ import {
   monthKeyOf,
 } from "./usage";
 import { UsageTreeProvider, usageTooltip } from "./usageTree";
+import { parseDoctorJson } from "./doctor";
+import { type FolderState, DoctorTreeProvider, type Node as DoctorNode } from "./doctorTree";
+import { type RunOutcome, runDoctor } from "./doctorRun";
 
 let statusItem: vscode.StatusBarItem;
 let panel: vscode.WebviewPanel | undefined;
@@ -124,6 +127,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   void refresh();
   void reloadIntents();
+  activateDoctor(context);
 }
 
 export function deactivate(): void {
@@ -132,6 +136,89 @@ export function deactivate(): void {
 
 function config() {
   return vscode.workspace.getConfiguration("aidlcToolkit");
+}
+
+// 診断のビュー。実行はボタンを押したときだけ。結果はフォルダごとに doctorTree.ts が持つ。
+function activateDoctor(context: vscode.ExtensionContext): void {
+  const doctor = new DoctorTreeProvider();
+  const view = vscode.window.createTreeView("aidlcToolkit.doctor", { treeDataProvider: doctor });
+  const output = vscode.window.createOutputChannel("AI-DLC Toolkit");
+  // 見出しのバッジ（失敗と警告の件数）は、結果が変わるたびに出し直す。
+  const onChange = doctor.onDidChangeTreeData(() => {
+    view.badge = doctor.badge();
+  });
+
+  // 記録のあるフォルダに合わせて一覧を置き直す。信頼していないフォルダは、実行せず「信頼していない」と出す。
+  const syncFolders = async (): Promise<void> => {
+    const folders = await recordFolders();
+    doctor.setFolders(folders);
+    for (const folder of folders) {
+      if (!vscode.workspace.isTrusted) doctor.setState(folder, { kind: "untrusted" });
+      else if (doctor.stateOf(folder).kind === "untrusted") doctor.setState(folder, { kind: "never" });
+    }
+  };
+
+  const runAll = async (): Promise<void> => {
+    const folders = await recordFolders();
+    doctor.setFolders(folders);
+    for (const folder of folders) {
+      if (!vscode.workspace.isTrusted) {
+        doctor.setState(folder, { kind: "untrusted" });
+        continue;
+      }
+      doctor.setState(folder, { kind: "running" });
+      const outcome = await runDoctor(folder.root, config().get<string>("aidlcPath", ""));
+      doctor.setState(folder, toFolderState(outcome));
+    }
+  };
+
+  context.subscriptions.push(
+    doctor,
+    view,
+    onChange,
+    output,
+    vscode.workspace.onDidChangeWorkspaceFolders(() => void syncFolders()),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => void syncFolders()),
+    vscode.commands.registerCommand("aidlcToolkit.doctor.run", () => void runAll()),
+    vscode.commands.registerCommand("aidlcToolkit.doctor.toggleOk", () => doctor.toggleOk()),
+    vscode.commands.registerCommand("aidlcToolkit.doctor.copyAll", () =>
+      void copyText(doctor.copyText(), "診断の結果をコピーしました"),
+    ),
+    vscode.commands.registerCommand("aidlcToolkit.doctor.copyItem", (node: DoctorNode) => {
+      if (node.kind === "item") void copyText(node.check.label, "項目をコピーしました");
+    }),
+    vscode.commands.registerCommand("aidlcToolkit.doctor.copyFix", (node: DoctorNode) => {
+      if (node.kind === "item" || node.kind === "fix") void copyText(node.check.fix ?? "", "直し方をコピーしました");
+    }),
+    // 読めなかった出力は、そのまま出力パネルに出す。画面の中には出さない。
+    vscode.commands.registerCommand("aidlcToolkit.doctor.showOutput", (folder: Folder) => {
+      const state = doctor.stateOf(folder);
+      if (state.kind !== "unreadable") return;
+      output.clear();
+      output.append(state.raw);
+      output.show(true);
+    }),
+  );
+  void syncFolders();
+}
+
+// 実行の結果を、ツリーの状態に直す。
+function toFolderState(outcome: RunOutcome): FolderState {
+  if (outcome.kind === "missing") return { kind: "missing" };
+  if (outcome.kind === "error") return { kind: "error", message: outcome.message };
+  const parsed = parseDoctorJson(outcome.stdout);
+  return parsed.ok
+    ? { kind: "result", at: new Date(), result: parsed.result }
+    : { kind: "unreadable", reason: parsed.reason, raw: outcome.stdout };
+}
+
+async function copyText(text: string, done: string): Promise<void> {
+  if (!text) {
+    vscode.window.setStatusBarMessage("コピーする結果がありません", 2000);
+    return;
+  }
+  await vscode.env.clipboard.writeText(text);
+  vscode.window.setStatusBarMessage(done, 2000);
 }
 
 // AI-DLC の記録があるワークスペースのフォルダ。
