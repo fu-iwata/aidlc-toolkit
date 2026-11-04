@@ -1,0 +1,37 @@
+name: Owner Approval
+
+# fu-iwata が作成した PR は承認なしで通す。それ以外の PR は fu-iwata の承認（最新のレビューが APPROVED）があるときだけ通す。
+# このチェックを ruleset の必須ステータスチェックにして、承認なしのマージを止める。
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  owner-approval:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      OWNER: fu-iwata
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: fu-iwata の承認を確認する
+        run: |
+          if [ "$AUTHOR" = "$OWNER" ]; then
+            echo "fu-iwata が作成した PR のため、承認は不要です"
+            exit 0
+          fi
+          state=$(gh pr view "$PR" --json reviews \
+            --jq "[.reviews[] | select(.author.login == \"$OWNER\")] | last | .state // \"NONE\"")
+          if [ "$state" = "APPROVED" ]; then
+            echo "fu-iwata の承認を確認しました"
+            exit 0
+          fi
+          echo "fu-iwata の承認が必要です（現在の状態: $state）"
+          exit 1
