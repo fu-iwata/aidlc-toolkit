@@ -8,9 +8,10 @@ AI-DLC（AI-Driven Development Life Cycle）で進めているプロジェクト
 
 - **Intent 一覧**（アクティビティバー）: ワークスペースの AI-DLC の intent を一覧にし、phase と stage ごとの進み具合と、intent ごとの推定コストを表示します。作業中の intent が分かり、状態ファイル（`aidlc-state.md`）を開いたり、intent 名をコピーしたりできます。
 - **使用量（今月）**（アクティビティバー）: 今月に完了した stage の使用量を、モデル別のトークン数と金額（USD と日本円）で表示します。
+- **診断**（アクティビティバー）: `aidlc doctor --json` の結果を、「失敗」「警告」「正常」に分けて表示します。実行は ▶ ボタンを押したときだけです。項目を開くと直し方が出ます。直し方のコマンドは実行せず、コピーできるだけです。
 - **ステータスバー**: 今月の推定コスト（例 `AI-DLC 推定 ¥1,234`）を表示します。クリックすると内訳の画面を開きます。
 
-記録が変わると自動で読み直します。拡張機能は記録を読むだけで、書き換えません。
+記録が変わると自動で読み直します。拡張機能は記録を読むだけで、書き換えません。ただし、**診断を実行すると、AI-DLC の audit（`aidlc/spaces/*/intents/audit/`）に記録が 2 件ずつ書き足されます。** git の未コミットの変更として見えることがあります。
 
 AI-DLC の記録が無いワークスペースでは起動せず、アクティビティバーのアイコンとステータスバーも出ません。開いた後に初めて記録を作ったときは、ウィンドウを再読み込み（「Developer: Reload Window」）すると表示されます。
 
@@ -38,6 +39,16 @@ AI-DLC 2.11.1 の記録（`aidlc-state.md`、`intents.json`、audit）の書式�
 }
 ```
 
+## 診断について
+
+診断は、ワークスペースで `aidlc --project-dir <フォルダ> doctor --json` を実行します。信頼していないワークスペースでは実行しません。
+
+- 実行するのは、▶ ボタンを押したときだけです。起動時や記録の変更では実行しません。
+- `aidlc` のコマンドは、設定 `aidlcToolkit.aidlcPath` があればそれを使います。無ければ PATH の `aidlc`、次に `~/.local/bin/aidlc` を探します。
+- 診断の結果は保存しません。ウィンドウを閉じると消えます。
+- 結果の読み方: `severity: warn` の項目は「警告」、`pass: false` で `severity` が無い項目は「失敗」、`pass: true` の項目は「正常」です。「正常」は見出しを開いて表示します。
+- 読めない形式（知らない `schemaVersion` など）の結果は、「文字の出力を開く」から出力パネルで確認できます。
+
 ## 設定
 
 | 設定 | 既定値 | 説明 |
@@ -46,6 +57,7 @@ AI-DLC 2.11.1 の記録（`aidlc-state.md`、`intents.json`、audit）の書式�
 | `aidlcToolkit.timeZone` | `Asia/Tokyo` | 「今月」の境界を決めるタイムゾーン（IANA 名）。 |
 | `aidlcToolkit.regionalPremium` | `false` | Amazon Bedrock の日本国内クロスリージョン推論（`jp.` の推論プロファイル）の上乗せ（+10%）を金額に含める。 |
 | `aidlcToolkit.modelRates` | `{}` | 自分で使う単価（USD / 100 万トークン）。モデルごとに、同梱の単価表より優先されます。ユーザー設定にだけ書けます。 |
+| `aidlcToolkit.aidlcPath` | 空 | 診断（`aidlc doctor`）に使う aidlc コマンドのパス。空なら PATH の `aidlc`、無ければ `~/.local/bin/aidlc`。ユーザー設定にだけ書けます。 |
 | `aidlcToolkit.modelRatesPath` | 空 | 同梱の単価表に無いモデルを補う単価表のパス。空ならワークスペースの `.claude/tools/data/model-rates.json`。ユーザー設定（リモートではそのマシンの設定）にだけ書けます。 |
 
 ## データの扱い
