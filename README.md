@@ -68,4 +68,4 @@ AI-DLC 2.11.1 の記録（`aidlc-state.md`、`intents.json`、audit）の書式�
 
 ## ライセンス
 
-MIT ライセンス。全文は拡張機能に同梱の LICENSE ファイルにあります。
+MIT ライセンスまたは Apache License 2.0 のいずれかを選択して利用できます（`MIT OR Apache-2.0`）。全文は拡張機能に同梱の `LICENSE-MIT` と `LICENSE-APACHE` にあります。
